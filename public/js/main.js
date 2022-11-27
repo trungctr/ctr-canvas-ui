@@ -1,15 +1,18 @@
 ﻿import * as THREE from '/three/build/three.module.js'
 import WebGLcheck from '/js/compatibility-check.js'
 import * as dat from '/js/dat.gui.min.js'
+import { BoxLineGeometry } from 'https://cdn.skypack.dev/three@0.135/examples/jsm/geometries/BoxLineGeometry.js'
+import { XRControllerModelFactory } from 'https://cdn.skypack.dev/three@0.135/examples/jsm/webxr/XRControllerModelFactory.js'
+
 //cần sửa lại đường dẫn mặc định của module three trong các file examples từ from 'three' thành  from '../../../build/three.module.js'
 import { OrbitControls } from '/three/examples/jsm/controls/OrbitControls.js'
 
 const renderer = new THREE.WebGL1Renderer()
 const textureLoader = new THREE.TextureLoader()
 renderer.shadowMap.enabled = true
+renderer.setPixelRatio(window.devicePixelRatio)
 
 const scene = new THREE.Scene()
-
 
 /**
  * add GUI
@@ -23,7 +26,8 @@ const options = {
 	'sLight shadow': true,
 	'sLight angle': 0.3,
 	'sLight penumbra': 0.1,
-	'sLight intensity': 1
+	'sLight intensity': 1,
+	WebXR: false
 }
 
 gui.addColor(options, 'Sphere color').onChange(function (e) {
@@ -50,12 +54,55 @@ gui.add(options, 'sLight penumbra', 0, 1)
 
 gui.add(options, 'sLight intensity', 0, 1)
 
+gui.add(options, 'WebXR').onChange(function (e) {
+	renderer.xr.enabled = e
+	camera.updateProjectionMatrix()
+	const controllerModelFactory = new XRControllerModelFactory()
+
+	// controller
+	const controller = renderer.xr.getController(0)
+	scene.add(controller)
+
+	const controllerGrip = renderer.xr.getControllerGrip(0)
+	controllerGrip.add(
+		controllerModelFactory.createControllerModel(controllerGrip)
+	)
+	scene.add(controllerGrip)
+
+	// controller
+	const controller1 = renderer.xr.getController(1)
+	scene.add(controller1)
+
+	const controllerGrip1 = renderer.xr.getControllerGrip(1)
+	controllerGrip1.add(
+		controllerModelFactory.createControllerModel(controllerGrip1)
+	)
+	scene.add(controllerGrip1)
+
+	//
+	const geometry = new THREE.BufferGeometry().setFromPoints([
+		new THREE.Vector3(0, 0, 0),
+		new THREE.Vector3(0, 0, -1)
+	])
+
+	const line = new THREE.Line(geometry)
+	line.name = 'line'
+	line.scale.z = 10
+
+	controller.add(line.clone())
+	controller1.add(line.clone())
+
+	const selectPressed = false
+
+	console.log('WebXR enabled = ' + e, renderer.xr)
+})
+
 /**
  * add environment effects
  */
 
 /** fog effect setting */
-scene.fog = new THREE.FogExp2(0xffffff,0.015)
+scene.fog = new THREE.FogExp2(0xffffff, 0.015)
 // scene.fog = new THREE.Fog(0xffffff,0, 200)
 
 /** scene background  setting */
@@ -74,10 +121,12 @@ directionalLight.castShadow = false
 directionalLight.shadow.camera.bottom = -10
 scene.add(directionalLight)
 
-const dLightHelper = new THREE.DirectionalLightHelper(directionalLight,30)
+const dLightHelper = new THREE.DirectionalLightHelper(directionalLight, 30)
 // scene.add(dLightHelper)
 
-const dLightShadowHelper = new THREE.CameraHelper(directionalLight.shadow.camera)
+const dLightShadowHelper = new THREE.CameraHelper(
+	directionalLight.shadow.camera
+)
 // scene.add(dLightShadowHelper)
 
 /** spot light effect setting */
@@ -166,6 +215,15 @@ function setUp() {
 	spotLight.intensity = options['sLight intensity']
 	sLightHelper.update(spotLight)
 }
+
+function maintainScene() {
+	window.addEventListener('resize', () => {
+		camera.aspect = window.innerWidth / window.innerHeight
+		camera.updateProjectionMatrix()
+		renderer.setSize(window.innerWidth, window.innerHeight)
+	})
+}
+maintainScene()
 
 function cubeRotate(fps) {
 	box.rotation.x += fps / 1000
